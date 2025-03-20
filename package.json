@@ -1,0 +1,59 @@
+{
+  "name": "n8n-nodes-openapi-compatible",
+  "version": "0.1.0",
+  "description": "An OpenAPI compatible node package for n8n.",
+  "keywords": [
+    "n8n-community-node-package"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/kphillipsjr1101/n8n-nodes-openapi-compatible",
+  "author": {
+    "name": "Kevin Phillips",
+    "email": "k.phillips.jr1101@gmail.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kphillipsjr1101/n8n-nodes-openapi-compatible.git"
+  },
+  "engines": {
+    "node": ">=18.10",
+    "pnpm": ">=9.1"
+  },
+  "packageManager": "pnpm@9.1.4",
+  "main": "index.js",
+  "scripts": {
+    "preinstall": "npx only-allow pnpm",
+    "build": "tsc && gulp build:icons",
+    "dev": "tsc --watch",
+    "test": "pnpm vitest --run",
+    "test:watch": "pnpm vitest --watch",
+    "format": "prettier nodes credentials --write",
+    "lint": "eslint nodes credentials package.json",
+    "lintfix": "eslint nodes credentials package.json --fix",
+    "prepublishOnly": "pnpm build && pnpm lint -c .eslintrc.prepublish.js nodes credentials package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "n8n": {},
+  "devDependencies": {
+    "@types/jest": "^29.5.14",
+    "@types/node": "^22.13.10",
+    "@typescript-eslint/parser": "^7.15.0",
+    "eslint": "^8.56.0",
+    "eslint-plugin-n8n-nodes-base": "^1.16.1",
+    "gulp": "^4.0.2",
+    "n8n-workflow": "^1.70.0",
+    "prettier": "^3.3.2",
+    "ts-jest": "^29.2.6",
+    "typescript": "^5.5.3",
+    "vite": "^6.2.2",
+    "vitest": "^3.0.9"
+  },
+  "peerDependencies": {
+    "n8n-workflow": "*"
+  },
+  "dependencies": {
+    "yaml": "^2.3.1"
+  }
+}
