@@ -35,7 +35,15 @@
   "files": [
     "dist"
   ],
-  "n8n": {},
+  "n8n": {
+    "n8nNodesApiVersion": 1,
+    "credentials": [
+      "dist/credentials/OpenApi.credentials.js"
+    ],
+    "nodes": [
+      "dist/nodes/OpenAPI/OpenAPI.node.js"
+    ]
+  },
   "devDependencies": {
     "@types/jest": "^29.5.14",
     "@types/node": "^22.13.10",
