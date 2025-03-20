@@ -41,7 +41,7 @@
       "dist/credentials/OpenApi.credentials.js"
     ],
     "nodes": [
-      "dist/nodes/OpenAPI/OpenAPI.node.js"
+      "dist/nodes/OpenAPINode/OpenApiNode.node.js"
     ]
   },
   "devDependencies": {
