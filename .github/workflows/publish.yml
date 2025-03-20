@@ -68,11 +68,6 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Publish to GitHub Packages
-        run: pnpm publish --registry=https://npm.pkg.github.com
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Push version changes
         if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
         run: git push --follow-tags
@@ -85,3 +80,5 @@ jobs:
           tag_name: v$(node -p "require('./package.json').version")
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+
