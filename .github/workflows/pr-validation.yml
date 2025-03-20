@@ -41,10 +41,3 @@ jobs:
 
       - name: Test
         run: pnpm test
-
-      - name: Enable Auto-merge
-        if: success()
-        run: |
-          gh pr merge --auto --squash "${{ github.event.pull_request.number }}"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
