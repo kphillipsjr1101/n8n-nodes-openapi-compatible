@@ -60,3 +60,6 @@ This does not currently populate the parameters for the operation, so you will n
 
 * 0.1.0
   * Initial release
+ 
+* 0.1.1
+  * Bugfix in package.json name
