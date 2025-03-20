@@ -1,0 +1,59 @@
+name: Build and Publish NPM Package
+
+on:
+  release:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (leave empty for patch)'
+        required: false
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          registry-url: 'https://registry.npmjs.org/'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: latest
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v3
+        with:
+          path: ~/.pnpm-store
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build package
+        run: pnpm build
+
+      - name: Bump version if manually triggered
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.version != ''
+        run: pnpm version ${{ github.event.inputs.version }}
+
+      - name: Bump patch version if manually triggered without version
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.version == ''
+        run: pnpm version patch
+
+      - name: Publish to NPM
+        run: pnpm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Push version changes
+        if: github.event_name == 'workflow_dispatch'
+        run: git push --follow-tags
