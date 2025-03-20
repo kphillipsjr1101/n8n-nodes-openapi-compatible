@@ -1,30 +1,30 @@
 name: Build and Publish NPM Package
 
 on:
-  release:
-    types: [created]
-  workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version to publish (leave empty for patch)'
-        required: false
   push:
     branches:
-      - main  # Triggers when PRs are merged to main
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+  id-token: write
 
 jobs:
   build-and-publish:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Fetch all history for proper versioning
+          fetch-depth: 0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: 'lts/*'
           registry-url: 'https://registry.npmjs.org/'
 
       - name: Install pnpm
@@ -46,49 +46,8 @@ jobs:
       - name: Build package
         run: pnpm build
 
-      - name: Configure Git for version changes
-        run: |
-          git config --global user.name "github-actions"
-          git config --global user.email "github-actions@users.noreply.github.com"
-
-      - name: Bump version if manually triggered with specific version
-        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.version != '' }}
-        run: pnpm version ${{ github.event.inputs.version }}
-
-      - name: Bump patch version if manually triggered without version
-        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.version == '' }}
-        run: pnpm version patch
-
-      - name: Bump patch version if PR merged to main
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-        run: pnpm version patch
-
-      - name: Check existing version and publish to NPM
-        run: |
-          PACKAGE_NAME=$(node -p "require('./package.json').name")
-          CURRENT_VERSION=$(node -p "require('./package.json').version")
-
-          # Check if version exists and increment patch if needed
-          if npm view ${PACKAGE_NAME}@${CURRENT_VERSION} version &> /dev/null; then
-            echo "Version ${CURRENT_VERSION} already exists, incrementing patch version"
-            pnpm version patch --no-git-tag-version
-          fi
-
-          pnpm publish --no-git-checks
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Push version changes
-        if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
-        run: git push --follow-tags
-
-      - name: Create GitHub Release
-        if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
-        uses: softprops/action-gh-release@v1
-        with:
-          generate_release_notes: true
-          tag_name: v$(node -p "require('./package.json').version")
+      - name: Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npx semantic-release
