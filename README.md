@@ -27,6 +27,8 @@ Operations are queried dynamically from the remote Swagger/OpenAPI endpoint. The
 Credentials are ✨ _optional_ ✨. You can use them to authenticate with the remote endpoint. Only some basic types of authentication are supported at this time. You will need to work around this limitation for authentication like OAuth2.
 
 When you create the credentials, it will ask you for the value of the authentication type you're using. Fill out the fields where appropriate. If you're not sure, you don't have to add a credential here. You can just add the values directly to the headers or query parameters in the node. Just make sure to refer to the documentation of the endpoint you're using. 📑
+![image](https://github.com/user-attachments/assets/2cb27b3a-5e03-4bdd-ad9f-52de6dd8f803)
+
 
 ## Compatibility
 
@@ -37,9 +39,13 @@ This node was tested with the following n8n version:
 
 Should be relatively self explanatory once you've added the node to your flow. Fill out the fields as needed. If you're not sure what to put in a field, refer to the documentation of the endpoint you're using. 📑
 
-In some cases a remote endpoint may not provide a baseUrl or you may want to develop and test against a different environment. You can set the baseUrl in the node settings. This will override the baseUrl provided by the remote endpoint.
+![image](https://github.com/user-attachments/assets/44454deb-1613-4a5f-9873-6f77d71458fa)
 
+In some cases a remote endpoint may not provide a baseUrl or you may want to develop and test against a different environment. You can set the baseUrl in the node settings. This will override the baseUrl provided by the remote endpoint.
 Once you have filled out the spec URL, on operations you can click the dots and refresh to get a dynamic list of valid API endpoints from the spec.
+
+![image](https://github.com/user-attachments/assets/59dc9389-266a-4fb3-ab3a-90e3afb61b9a)
+
 
 This does not currently populate the parameters for the operation, so you will need to refer to the documentation of the endpoint you're using to know what parameters are required. This was just a quick handjam to get something working. I will be adding more features as I have time. Feel free to contribute!
 
