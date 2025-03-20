@@ -8,6 +8,9 @@ on:
       version:
         description: 'Version to publish (leave empty for patch)'
         required: false
+  push:
+    branches:
+      - main  # Triggers when PRs are merged to main
 
 jobs:
   build-and-publish:
@@ -15,6 +18,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Fetch all history for proper versioning
 
       - name: Setup Node.js
         uses: actions/setup-node@v3
@@ -46,12 +51,16 @@ jobs:
           git config --global user.name "github-actions"
           git config --global user.email "github-actions@users.noreply.github.com"
 
-      - name: Bump version if manually triggered
+      - name: Bump version if manually triggered with specific version
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.version != ''
         run: pnpm version ${{ github.event.inputs.version }}
 
       - name: Bump patch version if manually triggered without version
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.version == ''
+        run: pnpm version patch
+
+      - name: Bump patch version if PR merged to main
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: pnpm version patch
 
       - name: Publish to NPM
@@ -60,5 +69,5 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Push version changes
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
         run: git push --follow-tags
