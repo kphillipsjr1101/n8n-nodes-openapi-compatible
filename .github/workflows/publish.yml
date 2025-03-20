@@ -52,15 +52,15 @@ jobs:
           git config --global user.email "github-actions@users.noreply.github.com"
 
       - name: Bump version if manually triggered with specific version
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.version != ''
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.version != '' }}
         run: pnpm version ${{ github.event.inputs.version }}
 
       - name: Bump patch version if manually triggered without version
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.version == ''
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.version == '' }}
         run: pnpm version patch
 
       - name: Bump patch version if PR merged to main
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         run: pnpm version patch
 
       - name: Publish to NPM
