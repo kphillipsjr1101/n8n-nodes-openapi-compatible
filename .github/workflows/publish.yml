@@ -1,6 +1,10 @@
 name: Build and Publish NPM Package
 
 on:
+  pull_request:
+    types: [closed]
+    branches:
+      - main
   push:
     branches:
       - main
