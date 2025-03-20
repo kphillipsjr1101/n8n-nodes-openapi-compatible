@@ -41,6 +41,11 @@ jobs:
       - name: Build package
         run: pnpm build
 
+      - name: Configure Git
+        run: |
+          git config --global user.name "Kevin Phillips"
+          git config --global user.email "k.phillips.jr1101@gmail.com"
+
       - name: Bump version if manually triggered
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.version != ''
         run: pnpm version ${{ github.event.inputs.version }}
