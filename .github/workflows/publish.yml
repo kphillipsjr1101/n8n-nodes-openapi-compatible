@@ -71,3 +71,12 @@ jobs:
       - name: Push version changes
         if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
         run: git push --follow-tags
+
+      - name: Create GitHub Release
+        if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+        uses: softprops/action-gh-release@v1
+        with:
+          generate_release_notes: true
+          tag_name: v$(node -p "require('./package.json').version")
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
