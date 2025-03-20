@@ -55,11 +55,3 @@ This does not currently populate the parameters for the operation, so you will n
 * [n8n.io](https://n8n.io/)
 * [n8n-node-openapi-compatible](https://github.com/kphillipsjr1101/n8n-nodes-openapi-compatible)
 * [OpenAPI Specification](https://github.com/OAI/OpenAPI-Specification)
-
-## Version history
-
-* 0.1.0
-  * Initial release
- 
-* 0.1.1
-  * Bugfix in package.json name
