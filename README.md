@@ -24,7 +24,7 @@ Operations are queried dynamically from the remote Swagger/OpenAPI endpoint. The
 
 ## Credentials
 
-Credentials are ✨ _optional_ ✨. You can use them to authenticate with the remote endpoint. Only some basic types of authentication are supported at this time. You will need to work around this limitation for authentication like OAuth2.
+Credentials are ✨ _optional_ ✨ but much cleaner than manually building headers and the like. You can use them to authenticate with the remote endpoint. Only some basic types of authentication are supported at this time. You will need to work around this limitation for authentication like OAuth2.
 
 When you create the credentials, it will ask you for the value of the authentication type you're using. Fill out the fields where appropriate. If you're not sure, you don't have to add a credential here. You can just add the values directly to the headers or query parameters in the node. Just make sure to refer to the documentation of the endpoint you're using. 📑
 ![image](https://github.com/user-attachments/assets/2cb27b3a-5e03-4bdd-ad9f-52de6dd8f803)
