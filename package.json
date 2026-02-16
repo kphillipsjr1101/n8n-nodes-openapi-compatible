@@ -57,7 +57,7 @@
     "ts-jest": "^29.2.6",
     "typescript": "^5.5.3",
     "vite": "^6.2.2",
-    "vitest": "^3.0.9"
+    "vitest": "^4.0.18"
   },
   "peerDependencies": {
     "n8n-workflow": "*"
