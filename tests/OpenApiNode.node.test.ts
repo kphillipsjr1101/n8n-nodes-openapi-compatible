@@ -21,11 +21,15 @@ vi.mock('../nodes/OpenAPINode/OpenApiDescription', () => ({
 	openApiFields: [],
 }));
 
-// Mock the helpers used by the node
-vi.mock('../nodes/OpenAPINode/OpenApiHelper', () => ({
-  loadOpenApiSpec: vi.fn(),
-  executeOpenApiRequest: vi.fn(),
-}));
+// Mock the network-bound helpers used by the node, keep the pure helpers real
+vi.mock('../nodes/OpenAPINode/OpenApiHelper', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../nodes/OpenAPINode/OpenApiHelper')>();
+  return {
+    ...actual,
+    loadOpenApiSpec: vi.fn(),
+    executeOpenApiRequest: vi.fn(),
+  };
+});
 
 describe('OpenApiNode', () => {
   let node: OpenApiNode;
@@ -76,6 +80,100 @@ describe('OpenApiNode', () => {
       // Act & Assert
       await expect(
         node.methods.loadOptions!.loadOperations.call(loadOptionsMethods)
+      ).rejects.toThrow(NodeOperationError);
+    });
+  });
+
+  describe('resourceMapping.getOperationParameters', () => {
+    const specWithParams = {
+      paths: {
+        '/users/{userId}': {
+          get: {
+            parameters: [
+              { name: 'userId', in: 'path', required: true, schema: { type: 'integer' } },
+              { name: 'verbose', in: 'query', schema: { type: 'boolean' } },
+            ],
+          },
+          put: {
+            requestBody: {
+              required: true,
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    required: ['name'],
+                    properties: { name: { type: 'string' }, age: { type: 'integer' } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    };
+
+    it('should build resource mapper fields from spec parameters', async () => {
+      (loadOpenApiSpec as any).mockResolvedValue(specWithParams);
+      loadOptionsMethods.getNodeParameter = vi.fn((param: string) => {
+        if (param === 'openApiUrl') return 'https://example.com/spec';
+        if (param === 'operation') return 'get:/users/{userId}';
+        return undefined;
+      }) as any;
+
+      const result = await node.methods.resourceMapping!.getOperationParameters.call(loadOptionsMethods);
+
+      expect(result.fields).toHaveLength(2);
+      expect(result.fields[0]).toMatchObject({
+        id: 'path:userId',
+        displayName: 'userId (path)',
+        required: true,
+        type: 'number',
+      });
+      expect(result.fields[1]).toMatchObject({
+        id: 'query:verbose',
+        required: false,
+        type: 'boolean',
+      });
+    });
+
+    it('should expose request body properties as body fields', async () => {
+      (loadOpenApiSpec as any).mockResolvedValue(specWithParams);
+      loadOptionsMethods.getNodeParameter = vi.fn((param: string) => {
+        if (param === 'openApiUrl') return 'https://example.com/spec';
+        if (param === 'operation') return 'put:/users/{userId}';
+        return undefined;
+      }) as any;
+
+      const result = await node.methods.resourceMapping!.getOperationParameters.call(loadOptionsMethods);
+
+      expect(result.fields).toEqual([
+        expect.objectContaining({ id: 'body:name', required: true, type: 'string' }),
+        expect.objectContaining({ id: 'body:age', required: false, type: 'number' }),
+      ]);
+    });
+
+    it('should return no fields when no operation is selected', async () => {
+      loadOptionsMethods.getNodeParameter = vi.fn((param: string) => {
+        if (param === 'openApiUrl') return 'https://example.com/spec';
+        if (param === 'operation') return '';
+        return undefined;
+      }) as any;
+
+      const result = await node.methods.resourceMapping!.getOperationParameters.call(loadOptionsMethods);
+      expect(result.fields).toEqual([]);
+      expect(loadOpenApiSpec).not.toHaveBeenCalled();
+    });
+
+    it('should throw NodeOperationError when spec loading fails', async () => {
+      (loadOpenApiSpec as any).mockRejectedValue(new Error('Spec load error'));
+      loadOptionsMethods.getNodeParameter = vi.fn((param: string) => {
+        if (param === 'openApiUrl') return 'https://example.com/spec';
+        if (param === 'operation') return 'get:/users/{userId}';
+        return undefined;
+      }) as any;
+
+      await expect(
+        node.methods.resourceMapping!.getOperationParameters.call(loadOptionsMethods)
       ).rejects.toThrow(NodeOperationError);
     });
   });
@@ -190,6 +288,43 @@ describe('OpenApiNode', () => {
         data: { data: 'base64-data', mimeType: 'application/pdf' },
       });
       expect(result[0][0].json).toEqual({});
+    });
+
+    it('should merge resource mapper values into parameters and request body', async () => {
+      executeFunctions.getNodeParameter = vi.fn((param: string, index: number, defaultValue?: unknown) => {
+        if (param === 'openApiUrl') return 'https://example.com/spec';
+        if (param === 'baseApiUrl') return 'https://api.example.com';
+        if (param === 'operation') return 'post:/users/{userId}';
+        if (param === 'parameters') return { parameter: [{ name: 'X-Manual', value: 'manual', type: 'header' }] };
+        if (param === 'operationParameters.value') {
+          return {
+            'path:userId': 42,
+            'query:verbose': true,
+            'body:name': 'Test User',
+          };
+        }
+        if (param === 'requestBody') return '{"existing": "value"}';
+        return defaultValue;
+      }) as any;
+
+      await node.execute.call(executeFunctions);
+
+      expect(executeOpenApiRequest).toHaveBeenCalledWith(
+        fakeSpec,
+        'post',
+        '/users/{userId}',
+        {
+          parameter: [
+            { name: 'userId', value: '42', type: 'path' },
+            { name: 'verbose', value: 'true', type: 'query' },
+            { name: 'X-Manual', value: 'manual', type: 'header' },
+          ],
+        },
+        { existing: 'value', name: 'Test User' },
+        { auth: 'dummy' },
+        'https://api.example.com',
+        { responseFormat: 'json', timeout: undefined }
+      );
     });
 
     it('should add error to return items and continue when continueOnFail is true', async () => {

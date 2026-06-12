@@ -47,7 +47,11 @@ Once you have filled out the spec URL, on operations you can click the dots and 
 ![image](https://github.com/user-attachments/assets/59dc9389-266a-4fb3-ab3a-90e3afb61b9a)
 
 
-This does not currently populate the parameters for the operation, so you will need to refer to the documentation of the endpoint you're using to know what parameters are required. This was just a quick handjam to get something working. I will be adding more features as I have time. Feel free to contribute!
+Once an operation is selected, the **Operation Parameters** section is populated directly from the OpenAPI spec — no need to refer to the API documentation. Required parameters (path, query, header, and cookie) are shown automatically with their expected types, optional parameters can be added from a dropdown, and enums are presented as selectable options. Top-level request body properties from the spec are exposed as individual `(body)` fields and are merged into the JSON request body.
+
+If you need to send something the spec doesn't define (or the spec is incomplete), the **Custom Parameters** collection still lets you add arbitrary path, query, header, and cookie parameters manually, and the **Request Body** field accepts raw JSON. Spec-defined and custom parameters are sent together.
+
+I will be adding more features as I have time. Feel free to contribute!
 
 ## Resources
 

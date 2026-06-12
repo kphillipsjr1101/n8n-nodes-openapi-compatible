@@ -32,6 +32,19 @@ describe('OpenApiDescription', () => {
 			});
 		});
 
+		it('should include an Operation Parameters resource mapper driven by the spec', () => {
+			const operationParametersField = openApiFields.find((field) => field.name === 'operationParameters');
+			expect(operationParametersField).toBeDefined();
+			if (operationParametersField) {
+				expect(operationParametersField.type).toBe('resourceMapper');
+				expect(operationParametersField.default).toEqual({ mappingMode: 'defineBelow', value: null });
+				const typeOptions = operationParametersField.typeOptions;
+				expect(typeOptions?.loadOptionsDependsOn).toEqual(['openApiUrl', 'operation']);
+				expect(typeOptions?.resourceMapper?.resourceMapperMethod).toBe('getOperationParameters');
+				expect(typeOptions?.resourceMapper?.mode).toBe('add');
+			}
+		});
+
 		it('should include a Parameters field of fixedCollection type', () => {
 			const parametersField = openApiFields.find((field) => field.name === 'parameters');
 			expect(parametersField).toBeDefined();
