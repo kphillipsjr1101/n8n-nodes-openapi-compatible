@@ -27,6 +27,10 @@ jobs:
           node-version: 'lts/*'
           registry-url: 'https://registry.npmjs.org/'
 
+      # npm >= 11.5.1 is required for trusted publishing (OIDC)
+      - name: Update npm
+        run: npm install -g npm@latest
+
       - name: Install pnpm
         uses: pnpm/action-setup@v4
 
@@ -47,5 +51,4 @@ jobs:
       - name: Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npx semantic-release
