@@ -1,4 +1,4 @@
-import { IDataObject } from 'n8n-workflow';
+import { IDataObject, FieldType, INodePropertyOptions } from 'n8n-workflow';
 import * as yaml from 'yaml';
 
 // Function to load and parse OpenAPI specification
@@ -46,6 +46,167 @@ export async function loadOpenApiSpec(url: string): Promise<any> {
 	} catch (error) {
 		throw new Error(`Failed to parse response: ${error.message}. Make sure the URL returns valid JSON or YAML.`);
 	}
+}
+
+// Resolve internal $ref pointers (e.g. '#/components/parameters/Limit') within the spec.
+// External references are returned unchanged.
+export function resolveRef(spec: any, obj: any): any {
+	let current = obj;
+	const seen = new Set<string>();
+
+	while (current && typeof current === 'object' && typeof current.$ref === 'string') {
+		const ref = current.$ref as string;
+		if (!ref.startsWith('#/') || seen.has(ref)) {
+			return current;
+		}
+		seen.add(ref);
+
+		let resolved: any = spec;
+		for (const segment of ref.slice(2).split('/')) {
+			// JSON pointer escaping: ~1 = '/', ~0 = '~'
+			resolved = resolved?.[segment.replace(/~1/g, '/').replace(/~0/g, '~')];
+		}
+
+		if (resolved === undefined) {
+			return current;
+		}
+		current = resolved;
+	}
+
+	return current;
+}
+
+export interface IOperationParameter {
+	name: string;
+	in: 'query' | 'path' | 'header' | 'cookie';
+	required: boolean;
+	description?: string;
+	schema?: any;
+}
+
+export interface IOperationDetails {
+	parameters: IOperationParameter[];
+	requestBodySchema?: any;
+	requestBodyRequired: boolean;
+}
+
+// Extract the parameters and request body schema defined in the spec for a single operation.
+// Supports both OpenAPI 3.x (requestBody) and Swagger 2.0 (in: 'body' parameters).
+export function getOperationDetails(spec: any, method: string, path: string): IOperationDetails {
+	const details: IOperationDetails = { parameters: [], requestBodyRequired: false };
+
+	const pathItem = resolveRef(spec, spec?.paths?.[path]);
+	const operation = pathItem?.[method.toLowerCase()];
+	if (!operation || typeof operation !== 'object') {
+		return details;
+	}
+
+	// Operation-level parameters override path-level ones with the same name and location
+	const merged = new Map<string, IOperationParameter>();
+	const rawParameters = [
+		...(Array.isArray(pathItem.parameters) ? pathItem.parameters : []),
+		...(Array.isArray(operation.parameters) ? operation.parameters : []),
+	];
+
+	for (const rawParam of rawParameters) {
+		const param = resolveRef(spec, rawParam);
+		if (!param?.name || !param?.in) continue;
+
+		if (param.in === 'body') {
+			// Swagger 2.0 style request body
+			details.requestBodySchema = resolveRef(spec, param.schema);
+			details.requestBodyRequired = param.required === true;
+			continue;
+		}
+
+		if (!['query', 'path', 'header', 'cookie'].includes(param.in)) continue;
+
+		merged.set(`${param.in}:${param.name}`, {
+			name: param.name,
+			in: param.in,
+			required: param.in === 'path' ? true : param.required === true,
+			description: param.description,
+			// Swagger 2.0 puts type/enum directly on the parameter instead of under schema
+			schema: resolveRef(spec, param.schema ?? (param.type ? param : undefined)),
+		});
+	}
+	details.parameters = [...merged.values()];
+
+	// OpenAPI 3.x request body (first JSON-like content type)
+	const requestBody = resolveRef(spec, operation.requestBody);
+	if (requestBody?.content) {
+		const jsonContentKey = Object.keys(requestBody.content).find((key) => key.includes('json'));
+		if (jsonContentKey) {
+			details.requestBodySchema = resolveRef(spec, requestBody.content[jsonContentKey].schema);
+			details.requestBodyRequired = requestBody.required === true;
+		}
+	}
+
+	return details;
+}
+
+// Map an OpenAPI/JSON schema to the field type used by n8n's resource mapper UI
+export function mapSchemaToFieldType(schema: any): { type: FieldType; options?: INodePropertyOptions[] } {
+	if (!schema || typeof schema !== 'object') {
+		return { type: 'string' };
+	}
+
+	if (Array.isArray(schema.enum) && schema.enum.length > 0) {
+		return {
+			type: 'options',
+			options: schema.enum.map((value: unknown) => ({ name: String(value), value: value as string })),
+		};
+	}
+
+	switch (schema.type) {
+		case 'integer':
+		case 'number':
+			return { type: 'number' };
+		case 'boolean':
+			return { type: 'boolean' };
+		case 'array':
+			return { type: 'array' };
+		case 'object':
+			return { type: 'object' };
+		case 'string':
+			return { type: schema.format === 'date-time' ? 'dateTime' : 'string' };
+		default:
+			return { type: 'string' };
+	}
+}
+
+export interface ISplitMappedParameters {
+	parameters: IDataObject[];
+	bodyFields: IDataObject;
+}
+
+// Split resource mapper values (keyed as '<location>:<name>') into request parameters
+// (compatible with the manual parameters collection) and request body fields
+export function splitMappedParameters(mapped: IDataObject): ISplitMappedParameters {
+	const parameters: IDataObject[] = [];
+	const bodyFields: IDataObject = {};
+
+	for (const [id, value] of Object.entries(mapped)) {
+		if (value === undefined || value === null || value === '') continue;
+
+		const separatorIndex = id.indexOf(':');
+		if (separatorIndex === -1) continue;
+
+		const location = id.slice(0, separatorIndex);
+		const name = id.slice(separatorIndex + 1);
+
+		if (location === 'body') {
+			bodyFields[name] = value;
+		} else if (['query', 'path', 'header', 'cookie'].includes(location)) {
+			parameters.push({
+				name,
+				value: typeof value === 'object' ? JSON.stringify(value) : String(value),
+				type: location,
+			});
+		}
+	}
+
+	return { parameters, bodyFields };
 }
 
 // Helper function to join URL parts correctly

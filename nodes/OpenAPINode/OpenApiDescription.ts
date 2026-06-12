@@ -24,7 +24,37 @@ export const openApiOperations: INodeProperties[] = [
 // Define fields for the OpenAPI node
 export const openApiFields: INodeProperties[] = [
 	{
-		displayName: 'Parameters',
+		displayName: 'Operation Parameters',
+		name: 'operationParameters',
+		type: 'resourceMapper',
+		noDataExpression: true,
+		default: {
+			mappingMode: 'defineBelow',
+			value: null,
+		},
+		displayOptions: {
+			show: {
+				resource: ['apiEndpoint'],
+			},
+		},
+		typeOptions: {
+			loadOptionsDependsOn: ['openApiUrl', 'operation'],
+			resourceMapper: {
+				resourceMapperMethod: 'getOperationParameters',
+				mode: 'add',
+				fieldWords: {
+					singular: 'parameter',
+					plural: 'parameters',
+				},
+				addAllFields: false,
+				supportAutoMap: false,
+				noFieldsError: 'The selected operation does not define any parameters in the OpenAPI spec. Use the Custom Parameters field below if you still need to send values.',
+			},
+		},
+		description: 'Parameters defined in the OpenAPI spec for the selected operation. Required parameters are added automatically; optional ones can be added as needed.',
+	},
+	{
+		displayName: 'Custom Parameters',
 		name: 'parameters',
 		placeholder: 'Add Parameter',
 		type: 'fixedCollection',
@@ -84,7 +114,7 @@ export const openApiFields: INodeProperties[] = [
 				],
 			},
 		],
-		description: 'Parameters to be sent',
+		description: 'Manually defined parameters, sent in addition to the spec-defined operation parameters above',
 	},
 	{
 		displayName: 'Request Body',

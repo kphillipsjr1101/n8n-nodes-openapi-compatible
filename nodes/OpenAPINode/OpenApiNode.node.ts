@@ -8,11 +8,35 @@ import {
 	INodePropertyOptions,
 	ICredentialDataDecryptedObject,
 	INodeInputConfiguration,
-	INodeOutputConfiguration
+	INodeOutputConfiguration,
+	ResourceMapperFields,
+	ResourceMapperField
 } from 'n8n-workflow';
 import { NodeOperationError } from 'n8n-workflow';
 import { openApiOperations, openApiFields } from './OpenApiDescription';
-import { loadOpenApiSpec, executeOpenApiRequest, IBinaryResponse } from './OpenApiHelper';
+import {
+	loadOpenApiSpec,
+	executeOpenApiRequest,
+	getOperationDetails,
+	mapSchemaToFieldType,
+	splitMappedParameters,
+	resolveRef,
+	IBinaryResponse
+} from './OpenApiHelper';
+
+const HTTP_METHODS = ['get', 'post', 'put', 'patch', 'delete', 'head', 'options', 'trace'];
+
+// The operation parameter is stored as 'method:path' but may also arrive as an object via expressions
+function parseOperationValue(operation: unknown): { method: string; path: string } | null {
+	if (typeof operation === 'string' && operation.includes(':')) {
+		const separatorIndex = operation.indexOf(':');
+		return { method: operation.slice(0, separatorIndex), path: operation.slice(separatorIndex + 1) };
+	}
+	if (typeof operation === 'object' && operation !== null && 'method' in operation && 'path' in operation) {
+		return operation as { method: string; path: string };
+	}
+	return null;
+}
 
 export class OpenApiNode implements INodeType {
 	description: INodeTypeDescription = {
@@ -81,6 +105,8 @@ export class OpenApiNode implements INodeType {
 					// Parse paths and methods from the OpenAPI spec
 					for (const path in spec.paths) {
 						for (const method in spec.paths[path]) {
+							// Skip non-operation keys like path-level 'parameters' or 'servers'
+							if (!HTTP_METHODS.includes(method.toLowerCase())) continue;
 							const operation = spec.paths[path][method];
 							operations.push({
 								name: `${method.toUpperCase()} ${path} - ${operation.summary || operation.operationId || ''}`,
@@ -93,6 +119,67 @@ export class OpenApiNode implements INodeType {
 				} catch (error) {
 					throw new NodeOperationError(this.getNode(), `Failed to load OpenAPI spec: ${error.message}`);
 				}
+			},
+		},
+		resourceMapping: {
+			// Build the parameter fields for the selected operation from the OpenAPI spec
+			async getOperationParameters(this: ILoadOptionsFunctions): Promise<ResourceMapperFields> {
+				const openApiUrl = this.getNodeParameter('openApiUrl', 0) as string;
+				const operation = parseOperationValue(this.getNodeParameter('operation', 0));
+
+				if (!openApiUrl || !operation) {
+					return { fields: [] };
+				}
+
+				let spec: any;
+				try {
+					spec = await loadOpenApiSpec(openApiUrl);
+				} catch (error) {
+					throw new NodeOperationError(this.getNode(), `Failed to load OpenAPI spec: ${error.message}`);
+				}
+
+				const { parameters, requestBodySchema, requestBodyRequired } = getOperationDetails(
+					spec,
+					operation.method,
+					operation.path,
+				);
+
+				const fields: ResourceMapperField[] = parameters.map((param) => {
+					const { type, options } = mapSchemaToFieldType(param.schema);
+					return {
+						id: `${param.in}:${param.name}`,
+						displayName: `${param.name} (${param.in})`,
+						required: param.required,
+						defaultMatch: false,
+						canBeUsedToMatch: false,
+						display: true,
+						type,
+						options,
+					};
+				});
+
+				// Expose top-level request body properties as individual fields
+				if (requestBodySchema?.properties && typeof requestBodySchema.properties === 'object') {
+					const requiredProps = new Set(
+						Array.isArray(requestBodySchema.required) ? requestBodySchema.required : [],
+					);
+					for (const [propName, rawPropSchema] of Object.entries(requestBodySchema.properties)) {
+						const propSchema = resolveRef(spec, rawPropSchema);
+						const { type, options } = mapSchemaToFieldType(propSchema);
+						fields.push({
+							id: `body:${propName}`,
+							displayName: `${propName} (body)`,
+							required: requestBodyRequired && requiredProps.has(propName),
+							defaultMatch: false,
+							canBeUsedToMatch: false,
+							display: true,
+							type,
+							options,
+						});
+					}
+				}
+
+				return { fields };
 			},
 		},
 	};
@@ -121,20 +208,26 @@ export class OpenApiNode implements INodeType {
 		for (let i = 0; i < items.length; i++) {
 			try {
 				// Get operation details
-				const operation = this.getNodeParameter('operation', i) as string | { method: string; path: string }; // updated type to support both string and object formats
-
-				// Updated extraction of method and path from the operation parameter:
-				let method: string, path: string;
-				if (typeof operation === 'string') {
-					[method, path] = operation.split(':');
-				} else if (typeof operation === 'object' && operation !== null) {
-					({ method, path } = operation);
-				} else {
+				const parsedOperation = parseOperationValue(this.getNodeParameter('operation', i));
+				if (!parsedOperation) {
 					throw new NodeOperationError(this.getNode(), 'Invalid operation parameter format');
 				}
+				const { method, path } = parsedOperation;
 
 				// Get parameters and request body
-				const parameters = this.getNodeParameter('parameters', i, {}) as IDataObject;
+				let parameters = this.getNodeParameter('parameters', i, {}) as IDataObject;
+
+				// Spec-defined parameters configured through the resource mapper UI
+				const mappedValues = this.getNodeParameter('operationParameters.value', i, null) as IDataObject | null;
+				const { parameters: specParameters, bodyFields } = splitMappedParameters(mappedValues ?? {});
+
+				if (specParameters.length > 0) {
+					const manualParameters = Array.isArray(parameters.parameter)
+						? (parameters.parameter as IDataObject[])
+						: [];
+					// Manual parameters come last so header values can override spec-mapped ones
+					parameters = { ...parameters, parameter: [...specParameters, ...manualParameters] };
+				}
 
 				// Make request body truly optional
 				let requestBody: IDataObject = {};
@@ -155,6 +248,11 @@ export class OpenApiNode implements INodeType {
 					}
 				} else {
 					requestBody = rawRequestBody as IDataObject;
+				}
+
+				// Spec-mapped body fields take precedence over the raw JSON body
+				if (Object.keys(bodyFields).length > 0) {
+					requestBody = { ...requestBody, ...bodyFields };
 				}
 
 				// Get request options (response format, timeout)
