@@ -12,7 +12,7 @@ import {
 } from 'n8n-workflow';
 import { NodeOperationError } from 'n8n-workflow';
 import { openApiOperations, openApiFields } from './OpenApiDescription';
-import { loadOpenApiSpec, executeOpenApiRequest } from './OpenApiHelper';
+import { loadOpenApiSpec, executeOpenApiRequest, IBinaryResponse } from './OpenApiHelper';
 
 export class OpenApiNode implements INodeType {
 	description: INodeTypeDescription = {
@@ -157,6 +157,11 @@ export class OpenApiNode implements INodeType {
 					requestBody = rawRequestBody as IDataObject;
 				}
 
+				// Get request options (response format, timeout)
+				const options = this.getNodeParameter('options', i, {}) as IDataObject;
+				const responseFormat = (options.responseFormat as 'json' | 'string' | 'binary') || 'json';
+				const timeout = options.timeout as number | undefined;
+
 				// Execute the request
 				const response = await executeOpenApiRequest(
 					spec,
@@ -166,14 +171,38 @@ export class OpenApiNode implements INodeType {
 					requestBody,
 					credentials,
 					baseApiUrl,
+					{ responseFormat, timeout },
 				);
 
-				returnItems.push({
-					json: response,
-					pairedItem: {
-						item: i,
-					},
-				});
+				if (responseFormat === 'binary') {
+					const { buffer, contentType } = response as IBinaryResponse;
+					const binaryData = await this.helpers.prepareBinaryData(buffer, undefined, contentType);
+					returnItems.push({
+						json: {},
+						binary: {
+							data: binaryData,
+						},
+						pairedItem: {
+							item: i,
+						},
+					});
+				} else if (responseFormat === 'string') {
+					returnItems.push({
+						json: {
+							data: response as string,
+						},
+						pairedItem: {
+							item: i,
+						},
+					});
+				} else {
+					returnItems.push({
+						json: response,
+						pairedItem: {
+							item: i,
+						},
+					});
+				}
 			} catch (error) {
 				if (this.continueOnFail()) {
 					returnItems.push({

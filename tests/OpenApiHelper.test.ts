@@ -247,6 +247,139 @@ describe('OpenApiHelper', () => {
 			)).rejects.toThrow('No server URL found');
 		});
 
+		it('should return raw text when response format is string', async () => {
+			const mockSpec = { openapi: '3.0.0' };
+			const textResponse = 'plain text response, not JSON';
+
+			fetchMock.mockResolvedValueOnce({
+				ok: true,
+				json: async () => { throw new Error('should not be called'); },
+				text: async () => textResponse
+			});
+
+			const result = await executeOpenApiRequest(
+				mockSpec,
+				'GET',
+				'/report',
+				{ parameter: [] } as IDataObject,
+				{},
+				{},
+				'https://api.example.com',
+				{ responseFormat: 'string' }
+			);
+
+			expect(result).toBe(textResponse);
+		});
+
+		it('should return a buffer and content type when response format is binary', async () => {
+			const mockSpec = { openapi: '3.0.0' };
+			const binaryContent = new TextEncoder().encode('binary-content').buffer;
+
+			fetchMock.mockResolvedValueOnce({
+				ok: true,
+				headers: { get: () => 'application/pdf' },
+				json: async () => { throw new Error('should not be called'); },
+				arrayBuffer: async () => binaryContent
+			});
+
+			const result = await executeOpenApiRequest(
+				mockSpec,
+				'GET',
+				'/download',
+				{ parameter: [] } as IDataObject,
+				{},
+				{},
+				'https://api.example.com',
+				{ responseFormat: 'binary' }
+			);
+
+			expect(Buffer.isBuffer(result.buffer)).toBe(true);
+			expect(result.buffer.toString()).toBe('binary-content');
+			expect(result.contentType).toBe('application/pdf');
+		});
+
+		it('should default to JSON parsing when no response format is given', async () => {
+			const mockSpec = { openapi: '3.0.0' };
+			const mockResponse = { data: 'test' };
+
+			fetchMock.mockResolvedValueOnce({
+				ok: true,
+				json: async () => mockResponse
+			});
+
+			const result = await executeOpenApiRequest(
+				mockSpec,
+				'GET',
+				'/users',
+				{ parameter: [] } as IDataObject,
+				{},
+				{},
+				'https://api.example.com'
+			);
+
+			expect(result).toEqual(mockResponse);
+		});
+
+		it('should send cookie parameters via the Cookie header', async () => {
+			const mockSpec = { openapi: '3.0.0' };
+
+			fetchMock.mockResolvedValueOnce({
+				ok: true,
+				json: async () => ({ data: 'test' })
+			});
+
+			await executeOpenApiRequest(
+				mockSpec,
+				'GET',
+				'/users',
+				{
+					parameter: [
+						{ type: 'cookie', name: 'session', value: 'abc123' },
+						{ type: 'cookie', name: 'theme', value: 'dark' }
+					]
+				} as IDataObject,
+				{},
+				{},
+				'https://api.example.com'
+			);
+
+			expect(fetchMock).toHaveBeenCalledWith(
+				'https://api.example.com/users',
+				expect.objectContaining({
+					headers: expect.objectContaining({
+						'Cookie': 'session=abc123; theme=dark'
+					})
+				})
+			);
+		});
+
+		it('should pass an abort signal when a timeout is configured', async () => {
+			const mockSpec = { openapi: '3.0.0' };
+
+			fetchMock.mockResolvedValueOnce({
+				ok: true,
+				json: async () => ({ data: 'test' })
+			});
+
+			await executeOpenApiRequest(
+				mockSpec,
+				'GET',
+				'/users',
+				{ parameter: [] } as IDataObject,
+				{},
+				{},
+				'https://api.example.com',
+				{ timeout: 5000 }
+			);
+
+			expect(fetchMock).toHaveBeenCalledWith(
+				'https://api.example.com/users',
+				expect.objectContaining({
+					signal: expect.any(AbortSignal)
+				})
+			);
+		});
+
 		it('should handle request bodies correctly', async () => {
 			const mockSpec = { openapi: '3.0.0' };
 			const requestBody = { name: 'Test User', email: 'test@example.com' };

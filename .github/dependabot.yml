@@ -9,3 +9,8 @@ updates:
     directory: "/" # Location of package manifests
     schedule:
       interval: "weekly"
+    commit-message:
+      # Conventional-commit prefixes so semantic-release picks these up:
+      # runtime dependency bumps publish a patch release, dev bumps do not
+      prefix: "fix(deps)"
+      prefix-development: "chore(deps)"
