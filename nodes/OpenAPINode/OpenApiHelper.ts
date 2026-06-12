@@ -61,6 +61,16 @@ function joinURLParts(base: string, path: string): string {
 	return `${cleanBase}${cleanPath}`;
 }
 
+export interface IRequestOptions {
+	responseFormat?: 'json' | 'string' | 'binary';
+	timeout?: number;
+}
+
+export interface IBinaryResponse {
+	buffer: Buffer;
+	contentType?: string;
+}
+
 // Function to execute an API request based on the OpenAPI specification
 export async function executeOpenApiRequest(
 	spec: any,
@@ -70,6 +80,7 @@ export async function executeOpenApiRequest(
 	requestBody: IDataObject,
 	credentials?: IDataObject,
 	baseApiUrl?: string,
+	requestOptions?: IRequestOptions,
 ): Promise<any> {
 	// Use baseApiUrl if provided, otherwise get server URL from the OpenAPI spec
 	let serverUrl = '';
@@ -116,6 +127,14 @@ export async function executeOpenApiRequest(
 		const headerParams = parameters.parameter.filter((param: IDataObject) => param.type === 'header');
 		for (const param of headerParams) {
 			headers[param.name as string] = param.value as string;
+		}
+
+		// Cookie parameters are sent via the Cookie header
+		const cookieParams = parameters.parameter.filter((param: IDataObject) => param.type === 'cookie');
+		if (cookieParams.length > 0) {
+			headers['Cookie'] = cookieParams
+				.map((param: IDataObject) => `${param.name}=${param.value}`)
+				.join('; ');
 		}
 	}
 
@@ -173,6 +192,11 @@ export async function executeOpenApiRequest(
 		headers,
 	};
 
+	// Abort the request if it takes longer than the configured timeout
+	if (requestOptions?.timeout && requestOptions.timeout > 0) {
+		options.signal = AbortSignal.timeout(requestOptions.timeout);
+	}
+
 	// Only add body for methods that support it and if there's actually content
 	if (methodSupportsBody && requestBody && Object.keys(requestBody).length > 0) {
 		options.body = JSON.stringify(requestBody);
@@ -185,6 +209,21 @@ export async function executeOpenApiRequest(
 		if (!response.ok) {
 			const errorText = await response.text();
 			throw new Error(`Request failed with status code ${response.status}: ${errorText}`);
+		}
+
+		const responseFormat = requestOptions?.responseFormat || 'json';
+
+		if (responseFormat === 'string') {
+			return await response.text();
+		}
+
+		if (responseFormat === 'binary') {
+			const arrayBuffer = await response.arrayBuffer();
+			const binaryResponse: IBinaryResponse = {
+				buffer: Buffer.from(arrayBuffer),
+				contentType: response.headers?.get('content-type') || undefined,
+			};
+			return binaryResponse;
 		}
 
 		return await response.json();

@@ -107,6 +107,12 @@ describe('OpenApiNode', () => {
         getCredentials: vi.fn().mockResolvedValue({ auth: 'dummy' }),
         continueOnFail: vi.fn().mockReturnValue(false),
         getNode: vi.fn().mockReturnValue({ name: 'OpenApiNode' }),
+        helpers: {
+          prepareBinaryData: vi.fn().mockResolvedValue({
+            data: 'base64-data',
+            mimeType: 'application/pdf',
+          }),
+        },
       } as unknown as IExecuteFunctions;
 
       (loadOpenApiSpec as any).mockResolvedValue(fakeSpec);
@@ -125,11 +131,65 @@ describe('OpenApiNode', () => {
         { id: 123 },
         { data: 'test' },
         { auth: 'dummy' },
-        'https://api.example.com'
+        'https://api.example.com',
+        { responseFormat: 'json', timeout: undefined }
       );
       expect(result[0]).toHaveLength(1);
       expect(result[0][0].json).toEqual({ success: true });
       expect(result[0][0].pairedItem.item).toBe(0);
+    });
+
+    it('should pass response format and timeout options to the request', async () => {
+      executeFunctions.getNodeParameter = vi.fn((param: string, index: number, defaultValue?: unknown) => {
+        if (param === 'openApiUrl') return 'https://example.com/spec';
+        if (param === 'baseApiUrl') return 'https://api.example.com';
+        if (param === 'operation') return { method: 'get', path: '/test' };
+        if (param === 'parameters') return {};
+        if (param === 'requestBody') return {};
+        if (param === 'options') return { responseFormat: 'string', timeout: 5000 };
+        return defaultValue;
+      }) as any;
+      (executeOpenApiRequest as any).mockResolvedValue('raw text response');
+      // Act
+      const result = await node.execute.call(executeFunctions);
+      // Assert
+      expect(executeOpenApiRequest).toHaveBeenCalledWith(
+        fakeSpec,
+        'get',
+        '/test',
+        {},
+        {},
+        { auth: 'dummy' },
+        'https://api.example.com',
+        { responseFormat: 'string', timeout: 5000 }
+      );
+      expect(result[0][0].json).toEqual({ data: 'raw text response' });
+    });
+
+    it('should return binary data when response format is binary', async () => {
+      executeFunctions.getNodeParameter = vi.fn((param: string, index: number, defaultValue?: unknown) => {
+        if (param === 'openApiUrl') return 'https://example.com/spec';
+        if (param === 'baseApiUrl') return 'https://api.example.com';
+        if (param === 'operation') return { method: 'get', path: '/test' };
+        if (param === 'parameters') return {};
+        if (param === 'requestBody') return {};
+        if (param === 'options') return { responseFormat: 'binary' };
+        return defaultValue;
+      }) as any;
+      const buffer = Buffer.from('binary-content');
+      (executeOpenApiRequest as any).mockResolvedValue({ buffer, contentType: 'application/pdf' });
+      // Act
+      const result = await node.execute.call(executeFunctions);
+      // Assert
+      expect((executeFunctions as any).helpers.prepareBinaryData).toHaveBeenCalledWith(
+        buffer,
+        undefined,
+        'application/pdf'
+      );
+      expect(result[0][0].binary).toEqual({
+        data: { data: 'base64-data', mimeType: 'application/pdf' },
+      });
+      expect(result[0][0].json).toEqual({});
     });
 
     it('should add error to return items and continue when continueOnFail is true', async () => {

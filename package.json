@@ -16,10 +16,16 @@
     "url": "https://github.com/kphillipsjr1101/n8n-nodes-openapi-compatible.git"
   },
   "engines": {
-    "node": ">=18.10",
+    "node": ">=20.15",
     "pnpm": ">=9.1"
   },
   "packageManager": "pnpm@9.1.4",
+  "pnpm": {
+    "overrides": {
+      "lodash": ">=4.18.0",
+      "uuid@<11.1.1": ">=11.1.1"
+    }
+  },
   "main": "index.js",
   "scripts": {
     "preinstall": "npx only-allow pnpm",
@@ -45,24 +51,22 @@
     ]
   },
   "devDependencies": {
-    "@types/jest": "^29.5.14",
     "@types/node": "^22.13.10",
     "@typescript-eslint/parser": "^7.15.0",
     "eslint": "^8.56.0",
     "eslint-plugin-n8n-nodes-base": "^1.16.1",
-    "gulp": "^4.0.2",
-    "n8n-workflow": "^1.70.0",
+    "gulp": "^5.0.1",
+    "n8n-workflow": "^2.8.0",
     "prettier": "^3.3.2",
-    "semantic-release": "^24.2.3",
-    "ts-jest": "^29.2.6",
+    "semantic-release": "^25.0.3",
     "typescript": "^5.5.3",
-    "vite": "^6.2.2",
-    "vitest": "^3.0.9"
+    "vite": "^6.4.1",
+    "vitest": "^4.0.18"
   },
   "peerDependencies": {
     "n8n-workflow": "*"
   },
   "dependencies": {
-    "yaml": "^2.3.1"
+    "yaml": "^2.8.2"
   }
 }
