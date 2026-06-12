@@ -1,0 +1,6 @@
+interface:
+  display_name: "N8n Nodes Openapi Compatible"
+  short_description: "Repo-specific patterns and workflows for n8n-nodes-openapi-compatible"
+  default_prompt: "Use the n8n-nodes-openapi-compatible repo skill to follow existing architecture, testing, and workflow conventions."
+policy:
+  allow_implicit_invocation: true
