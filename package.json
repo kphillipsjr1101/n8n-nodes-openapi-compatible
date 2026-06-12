@@ -1,6 +1,6 @@
 {
   "name": "n8n-nodes-openapi-compatible",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "An OpenAPI compatible node package for n8n.",
   "keywords": [
     "n8n-community-node-package"
@@ -51,6 +51,8 @@
     ]
   },
   "devDependencies": {
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/git": "^10.0.1",
     "@types/node": "^22.13.10",
     "@typescript-eslint/parser": "^7.15.0",
     "eslint": "^8.56.0",
