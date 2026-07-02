@@ -52,7 +52,7 @@
   },
   "devDependencies": {
     "@types/node": "^26.0.1",
-    "@typescript-eslint/parser": "^7.15.0",
+    "@typescript-eslint/parser": "^8.62.1",
     "eslint": "^8.56.0",
     "eslint-plugin-n8n-nodes-base": "^1.16.1",
     "gulp": "^5.0.1",
